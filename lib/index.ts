@@ -1,32 +1,95 @@
 import { Construct } from 'constructs';
-import * as sqs from 'aws-cdk-lib/aws-sqs';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
-import * as apigw from 'aws-cdk-lib/aws-apigateway';
-import * as event_sources from 'aws-cdk-lib/aws-lambda-event-sources';
+import { aws_events_targets, aws_lambda_event_sources, aws_events, aws_lambda, aws_sqs } from 'aws-cdk-lib';
 
-export interface DoubleEdgedLambdaProps extends lambda.FunctionProps {
+export interface ServerlessWorkloadProps extends aws_lambda.FunctionProps {
   /**
-   * An optional API gateway resource to associate with this function. If defined, a GET method will
-   * be added to this resource and the function will be attached to the method.
+   * Expose this workload via a public URL. If enabled, the `workload.url` property will return the
+   * public URL of this workload. The URL will be exposed without any authentication.
    *
-   * @default - no resource is associated with the function.
+   * @default false
    */
-  apiResource?: apigw.IResource;
+  readonly public?: boolean;
 
   /**
-   * Options for the SQS queue that will be created for this function.
-   * 
+   * Allow this workload to be triggered via by sending messages into an SQS queue.
+   *
+   * The `workload.queue` references the SQS queue that triggers this workload.
+   *
+   * A dead letter queue will automatically be associated with the SQS queue and can be accessed via
+   * the `workload.deadLetterQueue` property.
+   *
+   * @default false
+   */
+  readonly queue?: boolean;
+
+  /**
+   * Additional options for the queue.
    * @default - default options
    */
-  queueOptions?: sqs.QueueProps;
+  readonly queueOptions?: aws_sqs.QueueProps;  
+
+  /**
+   * Trigger this workload on a schedule.
+   * @default - no scheduled trigger
+   */
+  readonly schedule?: aws_events.Schedule;
 }
 
-export class DoubleEdgedLambda extends lambda.Function {
-  public queue: sqs.Queue;
-  constructor(scope: Construct, id: string, props: DoubleEdgedLambdaProps) {
+/**
+ * A serverless workload that can be deployed to AWS Lambda.
+ */
+export class ServerlessWorkload extends aws_lambda.Function {
+  /**
+   * The SQS queue associated with the workload, if `queue` is enabled.
+   */
+  public queue?: aws_sqs.Queue;
+
+  /**
+   * The dead letter queue associated with the workload's queue, if `queue` is enabled.
+   */
+  public deadLetterQueue?: aws_sqs.Queue;
+
+  /**
+   * The public URL of the workload, if `public` is enabled.
+   */
+  public url?: string;
+
+  constructor(scope: Construct, id: string, props: ServerlessWorkloadProps) {
     super(scope, id, props);
-    props.apiResource?.addMethod("GET", new apigw.LambdaIntegration(this));
-    this.queue = new sqs.Queue(this, 'Queue', props.queueOptions);
-    this.addEventSource(new event_sources.SqsEventSource(this.queue));
+
+    if (props.public ?? false) {
+      const url = this.addFunctionUrl({
+        authType: aws_lambda.FunctionUrlAuthType.NONE,
+        cors: {
+          allowedOrigins: ['*'],
+          allowedMethods: [aws_lambda.HttpMethod.ALL],
+        },
+      });
+
+      this.url = url.url;
+    }
+
+    if (props.queue ?? false) {
+      const dlq = new aws_sqs.Queue(this, 'DeadLetterQueue');
+
+      this.queue = new aws_sqs.Queue(this, 'Queue', {
+        deadLetterQueue: {
+          queue: dlq,
+          maxReceiveCount: 3,
+        },
+        ...props.queueOptions,
+      });
+
+      this.addEventSource(new aws_lambda_event_sources.SqsEventSource(this.queue));
+      this.deadLetterQueue = dlq;
+    }
+
+    if (props.schedule) {
+      const schedule = new aws_events.Rule(this, 'Schedule', {
+        schedule: props.schedule,
+      });
+
+      schedule.addTarget(new aws_events_targets.LambdaFunction(this));
+    }
   }
 }

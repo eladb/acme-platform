@@ -1,17 +1,16 @@
 /* global fetch */
 const lambda = require('@aws-sdk/client-lambda');
 const sqs = require('@aws-sdk/client-sqs');
-const { FUNCTION_ARN, QUEUE_URL, API_URL } = process.env;
+const { FUNCTION_ARN, QUEUE_URL, FUNCTION_URL } = process.env;
 const assert = require("assert");
 
 const lambdaClient = new lambda.LambdaClient();
 const sqsClient = new sqs.SQSClient();
 
-
 exports.handler = async (event) => {
   console.log('FUNCTION_ARN', FUNCTION_ARN);
+  console.log('FUNCTION_URL', FUNCTION_URL);
   console.log('QUEUE_URL', QUEUE_URL);
-  console.log('API_URL', API_URL);
   console.log('event', event);
   
   const payload = JSON.stringify({ hello: "Hello from test"});
@@ -27,7 +26,7 @@ exports.handler = async (event) => {
   assert.equal(response.body, "Hello, CDK!");
   
   // invoke the lambda through the API gateway
-  const apiResponse = await (await fetch(API_URL)).text();
+  const apiResponse = await (await fetch(FUNCTION_URL)).text();
   console.log(apiResponse);
   
   // send 10 messages to the queue

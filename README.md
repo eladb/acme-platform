@@ -10,32 +10,37 @@ function that can be invoked either through an API Gateway or via an SQS queue (
 Import the `DoubleEdgeLambda` construct from this library and use as follows:
 
 ```ts
-import { DoubleEdgedLambda } from 'double-edged-lambda';
-import { App, Stack, aws_apigateway, aws_lambda } from 'aws-cdk-lib';
+import { ServerlessWorkload } from '@acme/platform';
+import { App, Stack, aws_lambda } from 'aws-cdk-lib';
 
 const app = new App();
-const stack = new Stack(app, 'DoubleEdgedLambdaTestStack');
+const stack = new Stack(app, 'MyStack');
 
-const api = new aws_apigateway.RestApi(stack, "Api");
-
-const del = new DoubleEdgedLambda(stack, "DoubleEdgedLambda", {
-
-  // required lambda configuration
+const workload = new ServerlessWorkload(stack, "MyWorkload", {
+  // -- required --
   code: aws_lambda.Code.fromAsset("./handler"),
   runtime: aws_lambda.Runtime.NODEJS_20_X,
   handler: "index.handler",
-  
-  // optionally connect an API Gateway resource
-  apiResource: api.root,
 
-  // customize queue options as needed
-  queueOptions: { /* ... */ }
+  // -- optional --
 
+  // exposes this workload via a public URL
+  public: true,
+
+  // exposes this workload via an SQS queue
+  queue: true,
+
+  // triggers this workload on a schedule
+  schedule: aws_events.Schedule.rate(Duration.minutes(30)),
 });
 
-// you can access the associated queue like this
-const queueUrl = del.queue.queueUrl;
+const functionUrl = workload.url;
+const queueUrl = workload.queue.queueUrl;
+
+
 ```
+
+
 
 ## License
 
