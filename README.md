@@ -1,13 +1,12 @@
-# Double Edged Lambda Construct Library Example
+# The `ServerlessWorkload` Construct Library
 
-This is an example of an AWS CDK construct library that exposes an abstraction for an AWS Lambda
-function that can be invoked either through an API Gateway or via an SQS queue (or directly).
-
-![architecture](image.png)
+This is an example of an AWS CDK construct library which exposes an abstraction for a "serverless
+workload" based on AWS Lambda. Workloads can be triggered via a public URL, SQS queue or on
+schedule.
 
 ## Usage
 
-Import the `DoubleEdgeLambda` construct from this library and use as follows:
+Import the `ServerlessWorkload` construct from this library and use as follows:
 
 ```ts
 import { ServerlessWorkload } from '@acme/platform';
@@ -34,13 +33,13 @@ const workload = new ServerlessWorkload(stack, "MyWorkload", {
   schedule: aws_events.Schedule.rate(Duration.minutes(30)),
 });
 
-const functionUrl = workload.url;
-const queueUrl = workload.queue.queueUrl;
-
-
 ```
 
+Properties:
 
+* The `workload.url` is the public URL exposed by the workload.
+* The `workload.queue` is the SQS queue defined for this workload. You can send messages to this
+  queue to trigger the workload.
 
 ## License
 
